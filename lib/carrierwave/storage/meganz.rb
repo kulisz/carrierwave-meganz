@@ -1,13 +1,17 @@
+# encoding: utf-8
+
 require 'rmega'
 
 module CarrierWave
   module Storage
     class Meganz < Abstract
       def store!(file)
-        location = uploader.store_path
+        location = uploader.store_path.split('/')[0..-2]
 
-        folder = find_or_initialize_location(location.split('/')[0..-2], meganz_client.root)
-        folder.upload(file.to_file)
+        folder = find_or_initialize_location(location, meganz_client.root)
+        folder.upload(upload_file(file))
+
+        FileUtils.mv(I18n.transliterate(file.file), file.file) unless file.file == I18n.transliterate(file.file)
       end
 
       def retrieve!(file)
@@ -19,6 +23,13 @@ module CarrierWave
       end
 
       private
+
+      def upload_file(file)
+        return file.to_file if file.file == I18n.transliterate(file.file)
+
+        FileUtils.mv(file.file, I18n.transliterate(file.file))
+        I18n.transliterate(file.file)
+      end
 
       def config
         @config ||= {}
@@ -33,7 +44,7 @@ module CarrierWave
         return parent_folder if location.count.zero?
 
         child_folder = parent_folder.folders.find { |node| node.name == location.first }
-        parent_folder = parent_folder.create_folder(location.first) unless child_folder
+        parent_folder = child_folder ? child_folder : parent_folder.create_folder(location.first)
 
         find_or_initialize_location(location - [location.first], parent_folder)
       end
@@ -50,11 +61,24 @@ module CarrierWave
         end
 
         def url
-          @client.root.files.first.storage_url || @client.root.files.first.public_url
+          object.storage_url
         end
 
-        def download
-          @client.root.files.first.download('tmp/')
+        def public_url
+          object.public_url
+        end
+
+        def object
+          file_location_dir = @path.split('/')[-2] if @path.split('/').count > 1
+          file_name = @path.split('/').last
+
+          folder = if file_location_dir.present?
+                     @client.nodes.find { |node| node.type == :folder && node.name == file_location_dir }
+                   else
+                     @client.root
+                   end
+
+          folder.files.find { |f| f.name == file_name }
         end
 
         def delete; end

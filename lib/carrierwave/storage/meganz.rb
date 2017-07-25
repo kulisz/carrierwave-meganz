@@ -9,9 +9,9 @@ module CarrierWave
         location = uploader.store_path.split('/')[0..-2]
 
         folder = find_or_initialize_location(location, meganz_client.root)
-        folder.upload(upload_file(file))
-
-        FileUtils.mv(I18n.transliterate(file.file), file.file) unless file.file == I18n.transliterate(file.file)
+        # folder.upload(upload_file(file))
+        folder.upload(file.to_file)
+        # FileUtils.mv(I18n.transliterate(file.file), file.file) unless file.file == I18n.transliterate(file.file)
       end
 
       def retrieve!(file)
